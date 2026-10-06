@@ -1,7 +1,8 @@
 # Pushing a tag like v1.2.3 publishes the image to Docker Hub as
 # <DOCKERHUB_USERNAME>/tay-backend-scrobbler with tags 1.2.3, 1.2, 1 and latest.
-# Needs repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (an access
-# token with read/write scope).
+# It also copies README.md to the Docker Hub overview. Needs repository secrets
+# DOCKERHUB_USERNAME and DOCKERHUB_TOKEN: an access token with Read, Write,
+# Delete scope (updating the description needs more than Read & Write).
 name: Release
 
 on:
@@ -39,3 +40,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # Copies README.md to the Docker Hub overview page.
+      - uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/tay-backend-scrobbler
+          short-description: Scrobbles YouTube Music listening history to Last.fm, from a server
+          readme-filepath: ./README.md
+          # Turns relative links (compose.yaml, LICENSE) into GitHub links.
+          enable-url-completion: true
