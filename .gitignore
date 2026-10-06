@@ -1,0 +1,19 @@
+# Secrets and local state
+.env
+cookie.txt
+data/
+
+# Config files from older versions
+lastfm.json
+lastfm-session.json
+ntfy.json
+oauth-client.json
+oauth-token.json
+
+# Binaries
+/scrobbler
+/bin/
+
+# Nix / direnv
+result
+.direnv/

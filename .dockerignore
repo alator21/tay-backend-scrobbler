@@ -1,0 +1,6 @@
+# Only the Go sources go into the build context.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/

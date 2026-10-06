@@ -1,0 +1,31 @@
+# Example deployment. Fill in the values below, then:
+#   docker compose run --rm scrobbler auth   # once, prints LASTFM_SESSION_KEY
+#   docker compose up -d
+# This file then holds secrets: don't commit or share it as is.
+services:
+  scrobbler:
+    image: alator21/tay-backend-scrobbler:latest
+    restart: unless-stopped
+    environment:
+      # Last.fm API account: https://www.last.fm/api/account/create
+      LASTFM_API_KEY: ""
+      LASTFM_API_SECRET: ""
+      # Printed by `scrobbler auth`.
+      LASTFM_SESSION_KEY: ""
+      # Cookie header of a logged-in music.youtube.com request (see README).
+      # Leave empty to read data/cookie.txt instead, which can be replaced
+      # without a restart. Write any "$" in it as "$$".
+      YTM_COOKIE: ""
+      # Optional: alerts via ntfy, e.g. https://ntfy.sh/some-long-random-topic
+      NTFY_URL: ""
+      NTFY_TOKEN: ""
+      # Optional: URL to GET after every poll, e.g. an uptime monitor's push URL.
+      HEARTBEAT_URL: ""
+      TZ: UTC
+    volumes:
+      # Database and state, and cookie.txt unless YTM_COOKIE is set.
+      - ./data:/data
+    # The image runs as uid 65532. With a bind mount like ./data above, either
+    # make the directory writable for it (sudo chown 65532 data) or run as
+    # your own user:
+    # user: "1000:1000"
