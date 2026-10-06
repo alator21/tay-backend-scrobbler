@@ -32,10 +32,17 @@ var noise = regexp.MustCompile(`(?i)\s*[(\[][^()\[\]]*\b(official|video|audio|ly
 // separators split "Artist - Title" in upload titles.
 var separators = []string{" - ", " – ", " — "}
 
+// Options changes how metadata is cleaned. The zero value is the default.
+type Options struct {
+	// AllArtists scrobbles collaborations under all their artists, joined as
+	// "A & B", instead of the first one only.
+	AllArtists bool
+}
+
 // Clean returns what to scrobble for t. ok is false when there is no
 // trustworthy artist and title, e.g. an upload whose title has no
 // "Artist - Title" form, or a podcast episode.
-func Clean(t ytm.Track) (s Scrobble, ok bool) {
+func Clean(t ytm.Track, opts Options) (s Scrobble, ok bool) {
 	switch t.VideoType {
 	case "MUSIC_VIDEO_TYPE_UGC":
 		title := stripNoise(t.Title)
@@ -53,9 +60,13 @@ func Clean(t ytm.Track) (s Scrobble, ok bool) {
 	if len(t.Artists) == 0 {
 		return Scrobble{}, false
 	}
-	// Collaborations list several artists; Last.fm files the track under the
-	// primary one.
-	s = Scrobble{Artist: t.Artists[0], Track: t.Title, Album: t.Album}
+	// Collaborations list several artists; by default the track is filed under
+	// the primary one, as Last.fm usually does.
+	artist := t.Artists[0]
+	if opts.AllArtists {
+		artist = strings.Join(t.Artists, " & ")
+	}
+	s = Scrobble{Artist: artist, Track: t.Title, Album: t.Album}
 	if t.VideoType == "MUSIC_VIDEO_TYPE_OMV" {
 		s.Track = stripNoise(s.Track)
 	}

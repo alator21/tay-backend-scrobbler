@@ -59,8 +59,20 @@ All settings, including secrets, are environment variables.
 | `HEARTBEAT_URL` | Optional. GET after every poll, for a dead-man's-switch monitor such as an Uptime Kuma push monitor or healthchecks.io. |
 | `TZ` | Timezone for log timestamps. |
 
-`run` also takes flags: `-interval` (default 30s, while a song may be playing),
-`-idle-interval` (3m, otherwise) and `-send-interval` (15m, retrying pending plays).
+Optional tuning (defaults shown):
+
+| Variable | |
+|---|---|
+| `POLL_INTERVAL=30s` | How often to poll while a song may be playing. Shorter means tighter start times and play lengths. |
+| `IDLE_POLL_INTERVAL=3m` | How often to poll otherwise. |
+| `SEND_INTERVAL=15m` | How often to retry pending plays. Plays are also sent as soon as they end. |
+| `SCROBBLE_UNSURE=true` | Whether to scrobble plays whose length can't be told well enough to apply Last.fm's rule, typically after downtime. `false` marks them `skipped`. The last play of a session is scrobbled either way. |
+| `ARTIST_MODE=first` | `first` scrobbles collaborations under their first artist; `all` joins them as `A & B`. |
+| `RAW_RETENTION=336h` | How long to keep raw history responses (saved on fresh starts, resyncs and errors, for debugging; about 0.5 MB each). `0` doesn't save them. |
+
+Durations use Go syntax (`30s`, `5m`, `336h`). `run` also takes `-interval`,
+`-idle-interval` and `-send-interval` flags, which override the variables.
+Invalid values stop the scrobbler at startup with a message naming them.
 
 In a compose file, write any `$` in a value (cookies can contain one) as `$$`;
 compose would otherwise treat it as a variable. `cookie.txt` needs no escaping.
@@ -126,14 +138,15 @@ polling:
   polling the bounds are about ±1 min, enough to apply Last.fm's rule (played
   for half its length or 4 minutes) and tell skips from full plays. Plays
   whose bounds straddle the threshold, typically after downtime, are
-  scrobbled anyway and flagged as inferred.
+  scrobbled anyway and flagged as inferred (see `SCROBBLE_UNSURE`).
 - The last play of a session has no next play; it's assumed to have played
   through once it must have ended.
 - Album tracks have clean metadata. Official videos get suffixes like
   `(Official Video)` stripped. User uploads put the channel in the artist
   field and `Artist - Title` in the title, so artist and title are parsed out
   of the title; when that fails the play goes to `review` instead of being
-  scrobbled wrong. Collaborations are scrobbled under the first artist.
+  scrobbled wrong. Collaborations are scrobbled under the first artist (see
+  `ARTIST_MODE`).
 
 ### Limitations
 
@@ -181,7 +194,7 @@ go run ./cmd/scrobbler history    # uses ./data and data/cookie.txt by default
 The data directory also holds `events.jsonl` (one line per detected play,
 ended play, session end or resync), `last.json` (the previous snapshot, so
 restarts resume) and `raw/` (raw responses from fresh starts, resyncs and
-errors, kept 14 days).
+errors, kept for `RAW_RETENTION`).
 
 Releases: pushing a `v*.*.*` tag builds the multi-arch image and pushes it to
 Docker Hub (see `.github/workflows/release.yml`).

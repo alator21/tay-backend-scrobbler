@@ -54,8 +54,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cfg := loadConfig()
-	var err error
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 	switch cmd, args := flag.Arg(0), flag.Args()[1:]; cmd {
 	case "run":
 		err = runCmd(ctx, cfg, args)
@@ -111,9 +113,9 @@ func authCmd(ctx context.Context, cfg config) error {
 
 func runCmd(ctx context.Context, cfg config, args []string) error {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
-	interval := fs.Duration("interval", 30*time.Second, "poll interval while a song may be playing")
-	idleInterval := fs.Duration("idle-interval", 3*time.Minute, "poll interval otherwise")
-	sendInterval := fs.Duration("send-interval", 15*time.Minute, "how often to retry pending plays; plays are also sent as soon as they end")
+	interval := fs.Duration("interval", cfg.pollInterval, "poll interval while a song may be playing ($POLL_INTERVAL)")
+	idleInterval := fs.Duration("idle-interval", cfg.idlePollInterval, "poll interval otherwise ($IDLE_POLL_INTERVAL)")
+	sendInterval := fs.Duration("send-interval", cfg.sendInterval, "how often to retry pending plays; plays are also sent as soon as they end ($SEND_INTERVAL)")
 	fs.Parse(args)
 
 	st, err := cfg.store()
@@ -146,6 +148,7 @@ func runCmd(ctx context.Context, cfg config, args []string) error {
 		Dir:          cfg.dataDir,
 		Interval:     *interval,
 		IdleInterval: *idleInterval,
+		RawRetention: cfg.rawRetention,
 		Store:        st,
 		Alerts:       pollAlerts,
 		Polled:       heartbeat(ctx, cfg.heartbeatURL),
@@ -184,7 +187,7 @@ func runCmd(ctx context.Context, cfg config, args []string) error {
 }
 
 func historyCmd(ctx context.Context, cfg config) error {
-	p, err := poller.New(poller.Config{Cookie: cfg.cookie, CookiePath: cfg.cookieFile, Dir: cfg.dataDir})
+	p, err := poller.New(poller.Config{Cookie: cfg.cookie, CookiePath: cfg.cookieFile, Dir: cfg.dataDir, RawRetention: cfg.rawRetention})
 	if err != nil {
 		return err
 	}

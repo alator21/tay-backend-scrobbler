@@ -24,10 +24,27 @@ func TestPruneRaw(t *testing.T) {
 		}
 	}
 
-	(&Poller{cfg: Config{Dir: dir}}).pruneRaw(now)
+	(&Poller{cfg: Config{Dir: dir, RawRetention: 14 * 24 * time.Hour}}).pruneRaw(now)
 
 	entries, _ := os.ReadDir(raw)
 	if len(entries) != 1 || entries[0].Name() != "new.json.gz" {
 		t.Errorf("left %v, want only new.json.gz", entries)
+	}
+}
+
+func TestRawRetentionZero(t *testing.T) {
+	dir := t.TempDir()
+	raw := filepath.Join(dir, "raw")
+	if err := os.MkdirAll(raw, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(raw, "old.json.gz"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := &Poller{cfg: Config{Dir: dir}}
+	p.saveRaw(time.Now(), []byte(`{}`))
+	p.pruneRaw(time.Now())
+	if entries, _ := os.ReadDir(raw); len(entries) != 0 {
+		t.Errorf("with zero retention, want no raw files, got %v", entries)
 	}
 }

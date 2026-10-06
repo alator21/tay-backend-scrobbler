@@ -67,10 +67,18 @@ type Ending struct {
 	Min, Max time.Duration // unused for SessionEnd
 }
 
+// Policy changes what gets scrobbled. The zero value is the default.
+type Policy struct {
+	// SkipUnsure marks plays with an unsure verdict skipped instead of
+	// scrobbling them. Session ends are still scrobbled.
+	SkipUnsure bool
+	Meta       meta.Options
+}
+
 // status is the status a play gets once it has ended.
-func status(e Ending, cleaned bool) Status {
+func (p Policy) status(e Ending, cleaned bool) Status {
 	switch {
-	case e.Verdict == playtime.Skip:
+	case e.Verdict == playtime.Skip, e.Verdict == playtime.Unsure && p.SkipUnsure:
 		return Skipped
 	case !cleaned:
 		return Review
@@ -112,6 +120,8 @@ var migrations = []string{
 // Store is the plays database.
 type Store struct {
 	db *sql.DB
+	// Policy applies to plays added or ended from now on.
+	Policy Policy
 }
 
 // Open opens or creates the database at path, creating its directory if needed.
@@ -169,7 +179,7 @@ func (s *Store) AddPlay(ctx context.Context, t ytm.Track, started playtime.Windo
 		return err
 	}
 	var artist, track, album sql.NullString
-	sc, cleaned := meta.Clean(t)
+	sc, cleaned := meta.Clean(t, s.Policy.Meta)
 	if cleaned {
 		artist, track = nullString(sc.Artist), nullString(sc.Track)
 		album = nullString(sc.Album)
@@ -199,11 +209,11 @@ func (s *Store) EndPlay(ctx context.Context, t ytm.Track, started playtime.Windo
 		min = sql.NullInt64{Int64: int64(e.Min.Seconds()), Valid: true}
 		max = sql.NullInt64{Int64: int64(e.Max.Seconds()), Valid: true}
 	}
-	_, cleaned := meta.Clean(t)
+	_, cleaned := meta.Clean(t, s.Policy.Meta)
 	inferred := e.Verdict == playtime.Unsure || e.Verdict == SessionEnd
 	// Only a play still marked playing is updated, so a late duplicate
 	// can't undo a status that was already acted on.
-	st := status(e, cleaned)
+	st := s.Policy.status(e, cleaned)
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE plays SET min_sec = ?, max_sec = ?, verdict = ?, status = ?, inferred = ?
 		WHERE video_id = ? AND started_after = ? AND status = ?`,

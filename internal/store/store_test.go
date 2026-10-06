@@ -53,18 +53,21 @@ func TestStatus(t *testing.T) {
 		name    string
 		verdict playtime.Verdict
 		cleaned bool
+		policy  Policy
 		want    Status
 	}{
-		{"scrobble", playtime.Scrobble, true, Pending},
-		{"unsure is scrobbled", playtime.Unsure, true, Pending},
-		{"session end is scrobbled", SessionEnd, true, Pending},
-		{"skip", playtime.Skip, true, Skipped},
-		{"skip wins over bad metadata", playtime.Skip, false, Skipped},
-		{"bad metadata", playtime.Scrobble, false, Review},
+		{"scrobble", playtime.Scrobble, true, Policy{}, Pending},
+		{"unsure is scrobbled", playtime.Unsure, true, Policy{}, Pending},
+		{"session end is scrobbled", SessionEnd, true, Policy{}, Pending},
+		{"skip", playtime.Skip, true, Policy{}, Skipped},
+		{"skip wins over bad metadata", playtime.Skip, false, Policy{}, Skipped},
+		{"bad metadata", playtime.Scrobble, false, Policy{}, Review},
+		{"unsure skipped by policy", playtime.Unsure, true, Policy{SkipUnsure: true}, Skipped},
+		{"session end kept despite policy", SessionEnd, true, Policy{SkipUnsure: true}, Pending},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := status(Ending{Verdict: tt.verdict}, tt.cleaned); got != tt.want {
+			if got := tt.policy.status(Ending{Verdict: tt.verdict}, tt.cleaned); got != tt.want {
 				t.Errorf("got %s, want %s", got, tt.want)
 			}
 		})

@@ -4,7 +4,7 @@
 // Besides the store, it writes to the data directory:
 //
 //	raw/<time>.json.gz  raw responses (gzipped), saved on baseline, resyncs and errors;
-//	                    deleted after rawRetention
+//	                    deleted after Config.RawRetention
 //	events.jsonl        one line per detected play, ended play, session end or resync
 //	last.json           the previous snapshot, so restarts don't re-baseline
 //
@@ -96,6 +96,9 @@ type Config struct {
 	// Pending, if set, is called when a play becomes pending, i.e. ready to
 	// scrobble. It must not block.
 	Pending func()
+	// RawRetention is how long raw responses are kept, for debugging a resync
+	// or error; each is about 0.5 MB. Zero means they aren't saved.
+	RawRetention time.Duration
 	// Polled, if set, is called after every poll, successful or not, to show
 	// the poller is alive. It must not block.
 	Polled func()
@@ -348,6 +351,9 @@ func (p *Poller) setPrev(s snapshot) error {
 }
 
 func (p *Poller) saveRaw(now time.Time, raw []byte) {
+	if p.cfg.RawRetention == 0 {
+		return
+	}
 	// Responses are several MB of JSON; gzip shrinks them about 10x.
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
@@ -363,11 +369,8 @@ func (p *Poller) saveRaw(now time.Time, raw []byte) {
 	p.pruneRaw(now)
 }
 
-// rawRetention is how long raw responses are kept. They are only for
-// debugging a resync or error, and each is about 0.5 MB.
-const rawRetention = 14 * 24 * time.Hour
-
-// pruneRaw deletes raw responses older than rawRetention.
+// pruneRaw deletes raw responses older than RawRetention (all of them if it
+// is zero).
 func (p *Poller) pruneRaw(now time.Time) {
 	dir := filepath.Join(p.cfg.Dir, "raw")
 	entries, err := os.ReadDir(dir)
@@ -377,7 +380,7 @@ func (p *Poller) pruneRaw(now time.Time) {
 	}
 	for _, e := range entries {
 		info, err := e.Info()
-		if err != nil || !info.Mode().IsRegular() || now.Sub(info.ModTime()) < rawRetention {
+		if err != nil || !info.Mode().IsRegular() || now.Sub(info.ModTime()) < p.cfg.RawRetention {
 			continue
 		}
 		if err := os.Remove(filepath.Join(dir, e.Name())); err != nil {

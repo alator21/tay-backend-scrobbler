@@ -9,6 +9,7 @@ import (
 func TestClean(t *testing.T) {
 	tests := []struct {
 		name   string
+		all    bool
 		track  ytm.Track
 		want   Scrobble
 		wantOK bool
@@ -29,6 +30,20 @@ func TestClean(t *testing.T) {
 			name:   "collaboration uses first artist",
 			track:  ytm.Track{Title: "Song", Artists: []string{"A", "B"}, VideoType: "MUSIC_VIDEO_TYPE_ATV"},
 			want:   Scrobble{Artist: "A", Track: "Song"},
+			wantOK: true,
+		},
+		{
+			name:   "collaboration with all artists",
+			track:  ytm.Track{Title: "Song", Artists: []string{"A", "B"}, VideoType: "MUSIC_VIDEO_TYPE_ATV"},
+			all:    true,
+			want:   Scrobble{Artist: "A & B", Track: "Song"},
+			wantOK: true,
+		},
+		{
+			name:   "upload ignores all artists",
+			track:  ytm.Track{Title: "Paramore - Another Day", Artists: []string{"Bloom", "X"}, VideoType: "MUSIC_VIDEO_TYPE_UGC"},
+			all:    true,
+			want:   Scrobble{Artist: "Paramore", Track: "Another Day", Parsed: true},
 			wantOK: true,
 		},
 		{
@@ -79,7 +94,7 @@ func TestClean(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := Clean(tt.track)
+			got, ok := Clean(tt.track, Options{AllArtists: tt.all})
 			if ok != tt.wantOK {
 				t.Fatalf("ok = %v, want %v (got %+v)", ok, tt.wantOK, got)
 			}
