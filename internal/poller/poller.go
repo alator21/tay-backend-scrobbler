@@ -248,8 +248,15 @@ func (p *Poller) poll(ctx context.Context, now time.Time) error {
 		return p.setPrev(snapshot{PolledAt: now, Tracks: tracks})
 	}
 
-	n, err := diff.NewPlays(videoIDs(p.prev.Tracks), ids)
+	n, removed, err := diff.NewPlays(videoIDs(p.prev.Tracks), ids)
 	next := snapshot{PolledAt: now, Tracks: tracks, TopStarted: p.prev.TopStarted, SessionEnded: p.prev.SessionEnded}
+	if len(removed) > 0 {
+		log.Printf("note: %d video(s) removed from the history: %v", len(removed), removed)
+		if n == 0 && removed[0] == p.prev.Tracks[0].VideoID {
+			// The newest play is gone; its start doesn't apply to the new top.
+			next.TopStarted = nil
+		}
+	}
 	switch {
 	case err == nil && n == 0 && len(tracks) > 0:
 		if t := tracks[0]; next.TopStarted != nil && !next.SessionEnded && !next.topMayBePlaying(fetched) {
