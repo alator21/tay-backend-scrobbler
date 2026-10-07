@@ -117,6 +117,10 @@ func runCmd(ctx context.Context, cfg config, args []string) error {
 	idleInterval := fs.Duration("idle-interval", cfg.idlePollInterval, "poll interval otherwise ($IDLE_POLL_INTERVAL)")
 	sendInterval := fs.Duration("send-interval", cfg.sendInterval, "how often to retry pending plays; plays are also sent as soon as they end ($SEND_INTERVAL)")
 	fs.Parse(args)
+	cfg.pollInterval, cfg.idlePollInterval, cfg.sendInterval = *interval, *idleInterval, *sendInterval
+	for _, s := range cfg.describe() {
+		log.Printf("config: %s", s)
+	}
 
 	st, err := cfg.store()
 	if err != nil {

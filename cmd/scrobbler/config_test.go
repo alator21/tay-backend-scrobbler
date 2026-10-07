@@ -54,3 +54,28 @@ func TestLoadConfigErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribeHidesSecrets(t *testing.T) {
+	t.Setenv("YTM_COOKIE", "SID=cookie-secret")
+	t.Setenv("LASTFM_API_KEY", "key-secret")
+	t.Setenv("LASTFM_API_SECRET", "secret-secret")
+	t.Setenv("LASTFM_SESSION_KEY", "")
+	t.Setenv("NTFY_URL", "https://ntfy.sh/topic-secret")
+	t.Setenv("NTFY_TOKEN", "token-secret")
+	t.Setenv("HEARTBEAT_URL", "http://kuma:3001/api/push/push-secret?status=up")
+	t.Setenv("SCROBBLE_UNSURE", "false")
+	c, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(c.describe(), "\n")
+	if strings.Contains(got, "secret") {
+		t.Errorf("describe leaks a secret:\n%s", got)
+	}
+	for _, want := range []string{"YTM_COOKIE=(set)", "LASTFM_SESSION_KEY=(not set)", "NTFY_URL=https://ntfy.sh/…",
+		"HEARTBEAT_URL=http://kuma:3001/…", "SCROBBLE_UNSURE=false", "POLL_INTERVAL=30s"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("describe lacks %q:\n%s", want, got)
+		}
+	}
+}

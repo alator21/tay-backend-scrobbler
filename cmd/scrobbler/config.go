@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -87,6 +88,49 @@ func loadConfig() (config, error) {
 		errs = append(errs, fmt.Errorf("ARTIST_MODE=%q: want first or all", v))
 	}
 	return c, errors.Join(errs...)
+}
+
+// describe lists the settings as NAME=value, for the log. Secrets only show
+// whether they are set; URLs only their host, since their path can be one
+// (an ntfy topic, a push token).
+func (c config) describe() []string {
+	secret := func(v string) string {
+		if v == "" {
+			return "(not set)"
+		}
+		return "(set)"
+	}
+	host := func(v string) string {
+		if v == "" {
+			return "(not set)"
+		}
+		u, err := neturl.Parse(v)
+		if err != nil || u.Host == "" {
+			return "(set, invalid URL)"
+		}
+		return u.Scheme + "://" + u.Host + "/…"
+	}
+	artistMode := "first"
+	if c.policy.Meta.AllArtists {
+		artistMode = "all"
+	}
+	return []string{
+		"DATA_DIR=" + c.dataDir,
+		"YTM_COOKIE=" + secret(c.cookie),
+		"YTM_COOKIE_FILE=" + c.cookieFile,
+		"LASTFM_API_KEY=" + secret(c.lastfmKey),
+		"LASTFM_API_SECRET=" + secret(c.lastfmSecret),
+		"LASTFM_SESSION_KEY=" + secret(c.lastfmSession),
+		"NTFY_URL=" + host(c.ntfyURL),
+		"NTFY_TOKEN=" + secret(c.ntfyToken),
+		"HEARTBEAT_URL=" + host(c.heartbeatURL),
+		"POLL_INTERVAL=" + c.pollInterval.String(),
+		"IDLE_POLL_INTERVAL=" + c.idlePollInterval.String(),
+		"SEND_INTERVAL=" + c.sendInterval.String(),
+		"RAW_RETENTION=" + c.rawRetention.String(),
+		"SCROBBLE_UNSURE=" + strconv.FormatBool(!c.policy.SkipUnsure),
+		"ARTIST_MODE=" + artistMode,
+	}
 }
 
 func getenv(name, fallback string) string {
