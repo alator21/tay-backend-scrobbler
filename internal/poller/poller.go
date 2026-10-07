@@ -3,8 +3,8 @@
 //
 // Besides the store, it writes to the data directory:
 //
-//	raw/<time>.json.gz  raw responses (gzipped), saved on baseline, resyncs and errors;
-//	                    deleted after Config.RawRetention
+//	raw/<time>.json.gz  raw responses (gzipped), saved on baseline, resyncs, errors and
+//	                    when entries disappear or reappear; deleted after Config.RawRetention
 //	events.jsonl        one line per detected play, ended play, session end or resync
 //	last.json           the previous snapshot, so restarts don't re-baseline
 //
@@ -77,6 +77,12 @@ type played struct {
 	Verdict playtime.Verdict `json:"verdict"`
 }
 
+// minPlaySpacing is the least time plays can follow each other in, on
+// average. More new plays than a poll window allows at this pace means the
+// history changed in a way the diff misread, so the poll is treated as a
+// resync instead of adding them.
+const minPlaySpacing = 10 * time.Second
+
 // activeGrace is how long past the newest play's latest possible end polling
 // stays fast, to cover pauses and gaps between songs.
 const activeGrace = 2 * time.Minute
@@ -104,10 +110,15 @@ type Config struct {
 	Polled func()
 }
 
+// historyClient fetches the history; *ytm.Client, or a fake in tests.
+type historyClient interface {
+	History(ctx context.Context) ([]byte, []ytm.Track, error)
+}
+
 // Poller polls the history. Its methods must not be called concurrently.
 type Poller struct {
 	cfg       Config
-	client    *ytm.Client
+	client    historyClient
 	cookieMod time.Time // modification time of the loaded cookie file
 	prev      *snapshot
 }
@@ -248,14 +259,29 @@ func (p *Poller) poll(ctx context.Context, now time.Time) error {
 		return p.setPrev(snapshot{PolledAt: now, Tracks: tracks})
 	}
 
-	n, removed, err := diff.NewPlays(videoIDs(p.prev.Tracks), ids)
+	d, err := diff.NewPlays(videoIDs(p.prev.Tracks), ids)
+	n := d.New
+	// Entries missing from the previous response started after that
+	// request was sent, and before this response arrived.
+	started := playtime.Window{After: p.prev.PolledAt, Before: fetched}
+	if err == nil && !plausible(n, started) {
+		err = fmt.Errorf("%d new plays in %s is implausible", n, started.Before.Sub(started.After).Round(time.Second))
+		n = 0
+	}
 	next := snapshot{PolledAt: now, Tracks: tracks, TopStarted: p.prev.TopStarted, SessionEnded: p.prev.SessionEnded}
-	if len(removed) > 0 {
-		log.Printf("note: %d video(s) removed from the history: %v", len(removed), removed)
-		if n == 0 && removed[0] == p.prev.Tracks[0].VideoID {
+	if err == nil && (len(d.Removed) > 0 || len(d.Reappeared) > 0) {
+		// Usually a glitch in YT Music's response; keep it for debugging.
+		p.saveRaw(now, raw)
+	}
+	if err == nil && len(d.Removed) > 0 {
+		log.Printf("note: %d video(s) removed from the history: %v", len(d.Removed), d.Removed)
+		if n == 0 && d.Removed[0] == p.prev.Tracks[0].VideoID {
 			// The newest play is gone; its start doesn't apply to the new top.
 			next.TopStarted = nil
 		}
+	}
+	if err == nil && len(d.Reappeared) > 0 {
+		log.Printf("note: %d video(s) back in the history: %v", len(d.Reappeared), d.Reappeared)
 	}
 	switch {
 	case err == nil && n == 0 && len(tracks) > 0:
@@ -273,9 +299,6 @@ func (p *Poller) poll(ctx context.Context, now time.Time) error {
 		p.appendEvent(event{Type: "resync", DetectedAt: now, PrevPollAt: &p.prev.PolledAt})
 		next.TopStarted = nil
 	case n > 0:
-		// Entries missing from the previous response started after that
-		// request was sent, and before this response arrived.
-		started := playtime.Window{After: p.prev.PolledAt, Before: fetched}
 		starts := playtime.Starts(started, n) // oldest first
 		var last *ytm.Track
 		if len(p.prev.Tracks) > 0 {
@@ -305,6 +328,11 @@ func (p *Poller) poll(ctx context.Context, now time.Time) error {
 	}
 	log.Printf("poll ok: %d entries, %d new", len(tracks), n)
 	return p.setPrev(next)
+}
+
+// plausible reports whether n plays can all have started in w.
+func plausible(n int, w playtime.Window) bool {
+	return n <= 1+int(w.Before.Sub(w.After)/minPlaySpacing)
 }
 
 // ended records how long t, which started in the window started, ran before

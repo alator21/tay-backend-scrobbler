@@ -68,7 +68,7 @@ Optional tuning (defaults shown):
 | `SEND_INTERVAL=15m` | How often to retry pending plays. Plays are also sent as soon as they end. |
 | `SCROBBLE_UNSURE=true` | Whether to scrobble plays whose length can't be told well enough to apply Last.fm's rule, typically after downtime. `false` marks them `skipped`. The last play of a session is scrobbled either way. |
 | `ARTIST_MODE=first` | `first` scrobbles collaborations under their first artist; `all` joins them as `A & B`. |
-| `RAW_RETENTION=336h` | How long to keep raw history responses (saved on fresh starts, resyncs and errors, for debugging; about 0.5 MB each). `0` doesn't save them. |
+| `RAW_RETENTION=336h` | How long to keep raw history responses (saved on fresh starts, resyncs, errors and when entries vanish from or return to the history, for debugging; about 0.5 MB each). `0` doesn't save them. |
 
 Durations use Go syntax (`30s`, `5m`, `336h`). `run` also takes `-interval`,
 `-idle-interval` and `-send-interval` flags, which override the variables.
