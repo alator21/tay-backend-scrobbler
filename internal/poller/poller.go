@@ -121,6 +121,7 @@ type Poller struct {
 	client    historyClient
 	cookieMod time.Time // modification time of the loaded cookie file
 	prev      *snapshot
+	now       func() time.Time // when a response arrived; time.Now, or a fake clock in tests
 }
 
 // New loads the cookie and the previous snapshot, if there is one.
@@ -128,7 +129,7 @@ func New(cfg Config) (*Poller, error) {
 	if err := os.MkdirAll(filepath.Join(cfg.Dir, "raw"), 0o700); err != nil {
 		return nil, err
 	}
-	p := &Poller{cfg: cfg}
+	p := &Poller{cfg: cfg, now: time.Now}
 	p.pruneRaw(time.Now())
 	if err := p.loadCookie(); err != nil {
 		return nil, err
@@ -240,7 +241,7 @@ func (p *Poller) report(ctx context.Context, err error) {
 
 func (p *Poller) poll(ctx context.Context, now time.Time) error {
 	raw, tracks, err := p.client.History(ctx)
-	fetched := time.Now()
+	fetched := p.now()
 	if err != nil {
 		if raw != nil {
 			p.saveRaw(now, raw)
