@@ -209,8 +209,8 @@ func (p *Poller) loadCookie() error {
 }
 
 // report logs the outcome of a poll and raises or clears alerts. An expired
-// cookie is alerted right away; other failures once they have lasted a while,
-// to ride out network blips.
+// cookie is alerted right away; other failures, including an empty history
+// with a working cookie, once they have lasted a while, to ride out blips.
 func (p *Poller) report(ctx context.Context, err error) {
 	cookie := errors.Is(err, ytm.ErrAuth) || errors.Is(err, ytm.ErrNoHistory)
 	switch {

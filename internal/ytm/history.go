@@ -14,6 +14,11 @@ import (
 // response this usually means the cookie is no longer logged in.
 var ErrNoHistory = errors.New("ytm: no history in response")
 
+// ErrEmptyHistory means a logged-in response listed no history, only the
+// "Once you listen to something" message. YouTube Music sends this now and
+// then for a single poll, so it isn't taken as an expired cookie.
+var ErrEmptyHistory = errors.New("ytm: empty history in logged-in response")
+
 // Track is one entry of the listening history, newest first.
 type Track struct {
 	VideoID     string   `json:"videoId"`
@@ -50,9 +55,16 @@ func ParseHistory(raw []byte) ([]Track, error) {
 	}
 	// A logged-out request still gets a 200 with a section list, holding only
 	// a "Sign in to view your history" message.
+	loggedIn := false
 	for _, p := range gjson.GetBytes(raw, "responseContext.serviceTrackingParams.#.params|@flatten").Array() {
-		if p.Get("key").String() == "logged_in" && p.Get("value").String() == "0" {
+		if p.Get("key").String() != "logged_in" {
+			continue
+		}
+		switch p.Get("value").String() {
+		case "0":
 			return nil, fmt.Errorf("%w: not logged in", ErrNoHistory)
+		case "1":
+			loggedIn = true
 		}
 	}
 
@@ -83,6 +95,9 @@ func ParseHistory(raw []byte) ([]Track, error) {
 			t.Section = label
 			tracks = append(tracks, t)
 		}
+	}
+	if shelves == 0 && loggedIn && message != "" {
+		return nil, fmt.Errorf("%w (%s)", ErrEmptyHistory, message)
 	}
 	if shelves == 0 {
 		return nil, fmt.Errorf("%w: no history shelf (%s)", ErrNoHistory, message)

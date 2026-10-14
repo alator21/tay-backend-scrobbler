@@ -1,0 +1,113 @@
+{
+  "responseContext": {
+    "serviceTrackingParams": [
+      {
+        "service": "GFEEDBACK",
+        "params": [
+          {
+            "key": "browse_id",
+            "value": "FEmusic_history"
+          },
+          {
+            "key": "browse_id_prefix",
+            "value": ""
+          },
+          {
+            "key": "logged_in",
+            "value": "1"
+          }
+        ]
+      },
+      {
+        "service": "CSI",
+        "params": [
+          {
+            "key": "c",
+            "value": "WEB_REMIX"
+          },
+          {
+            "key": "cver",
+            "value": "1.20261014.01.00"
+          },
+          {
+            "key": "yt_li",
+            "value": "1"
+          },
+          {
+            "key": "GetBrowseHistoryPage_rid",
+            "value": "0xf5a54bc8855f5e81"
+          }
+        ]
+      },
+      {
+        "service": "ECATCHER",
+        "params": [
+          {
+            "key": "client.version",
+            "value": "1.20000101"
+          },
+          {
+            "key": "client.name",
+            "value": "WEB_REMIX"
+          }
+        ]
+      }
+    ],
+    "maxAgeSeconds": 0,
+    "responseId": "IhMI6JnzhMS5lwMVR1hBAh09aAkH"
+  },
+  "contents": {
+    "singleColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "title": "Recently played",
+            "selected": true,
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "itemSectionRenderer": {
+                      "contents": [
+                        {
+                          "messageRenderer": {
+                            "text": {
+                              "runs": [
+                                {
+                                  "text": "Once you listen to something it will show up here."
+                                }
+                              ]
+                            },
+                            "trackingParams": "CAUQljsYACITCOiZ84TEuZcDFUdYQQIdPWgJBw=="
+                          }
+                        }
+                      ],
+                      "trackingParams": "CAQQuy8YACITCOiZ84TEuZcDFUdYQQIdPWgJBw=="
+                    }
+                  }
+                ],
+                "trackingParams": "CAMQui8iEwjomfOExLmXAxVHWEECHT1oCQc=",
+                "targetId": "browse-feedFEmusic_history"
+              }
+            },
+            "tabIdentifier": "FEmusic_history",
+            "trackingParams": "CAIQ8JMBGAAiEwjomfOExLmXAxVHWEECHT1oCQc="
+          }
+        }
+      ]
+    }
+  },
+  "header": {
+    "musicHeaderRenderer": {
+      "title": {
+        "runs": [
+          {
+            "text": "History"
+          }
+        ]
+      },
+      "trackingParams": "CAEQ4HIiEwjomfOExLmXAxVHWEECHT1oCQc="
+    }
+  },
+  "trackingParams": "CAAQhGciEwjomfOExLmXAxVHWEECHT1oCQfKAQRMAQQP"
+}

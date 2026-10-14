@@ -1,10 +1,17 @@
 package poller
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/alator21/tay-backend-scrobbler/internal/alert"
+	"github.com/alator21/tay-backend-scrobbler/internal/notify"
+	"github.com/alator21/tay-backend-scrobbler/internal/ytm"
 )
 
 func TestPruneRaw(t *testing.T) {
@@ -46,5 +53,42 @@ func TestRawRetentionZero(t *testing.T) {
 	p.pruneRaw(time.Now())
 	if entries, _ := os.ReadDir(raw); len(entries) != 0 {
 		t.Errorf("with zero retention, want no raw files, got %v", entries)
+	}
+}
+
+type sentAlerts []string
+
+func (s *sentAlerts) Send(_ context.Context, m notify.Message) error {
+	*s = append(*s, m.Title)
+	return nil
+}
+
+// An expired cookie is alerted on the first failed poll; an empty history
+// in a logged-in response, which YouTube Music sends now and then for a
+// single poll, is not.
+func TestReportCookieAlert(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"logged out", fmt.Errorf("%w: not logged in", ytm.ErrNoHistory), 1},
+		{"auth rejected", ytm.ErrAuth, 1},
+		{"empty history", ytm.ErrEmptyHistory, 0},
+		{"network", errors.New("dial tcp: lookup music.youtube.com"), 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sent sentAlerts
+			alerts, err := alert.New(&sent, filepath.Join(t.TempDir(), "alerts.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := &Poller{cfg: Config{Alerts: alerts}}
+			p.report(context.Background(), tt.err)
+			if len(sent) != tt.want {
+				t.Errorf("sent %v, want %d alert(s)", sent, tt.want)
+			}
+		})
 	}
 }

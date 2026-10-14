@@ -2,6 +2,7 @@ package ytm
 
 import (
 	"errors"
+	"os"
 	"testing"
 )
 
@@ -46,5 +47,18 @@ func TestParseHistory(t *testing.T) {
 	if len(tracks) != 1 || tracks[0].Title != want.Title || tracks[0].Album != want.Album || tracks[0].DurationSec != want.DurationSec ||
 		tracks[0].Section != want.Section || len(tracks[0].Artists) != 1 || tracks[0].Artists[0] != "Paramore" {
 		t.Errorf("tracks = %+v", tracks)
+	}
+}
+
+// A logged-in response with no history, as YouTube Music sent it for single
+// polls on 2026-10-14 between full ones, is not a logged-out one.
+func TestParseHistoryEmptyLoggedIn(t *testing.T) {
+	raw, err := os.ReadFile("testdata/history-empty-logged-in.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ParseHistory(raw)
+	if !errors.Is(err, ErrEmptyHistory) || errors.Is(err, ErrNoHistory) {
+		t.Errorf("err = %v, want ErrEmptyHistory only", err)
 	}
 }
