@@ -17,10 +17,29 @@ multi-arch Docker image.
 1. **Last.fm API account.** Create one at https://www.last.fm/api/account/create
    (the callback URL can stay empty) and note the API key and shared secret.
 2. **YouTube Music cookie.** See [Getting the cookie](#getting-the-cookie).
-3. **Configure.** Copy [`compose.yaml`](compose.yaml) into a directory and fill in
-   `LASTFM_API_KEY`, `LASTFM_API_SECRET`, and either `YTM_COOKIE` or a
-   `data/cookie.txt` file. The values go straight into its `environment:`
-   block; if you'd rather keep secrets out of the compose file, use
+3. **Configure.** In a new directory, create `compose.yaml`:
+
+   ```yaml
+   services:
+     scrobbler:
+       image: alator21/tay-backend-scrobbler:latest
+       restart: unless-stopped
+       environment:
+         LASTFM_API_KEY: ""
+         LASTFM_API_SECRET: ""
+         LASTFM_SESSION_KEY: ""   # filled in at step 4
+         YTM_COOKIE: ""           # or leave empty and use data/cookie.txt
+         TZ: UTC
+       volumes:
+         - ./data:/data
+   ```
+
+   Fill in the API key and secret, and either `YTM_COOKIE` (write any `$` in
+   it as `$$`) or a `data/cookie.txt` file. Then make the data directory
+   writable for the image's user: `mkdir -p data && sudo chown 65532 data`.
+   The optional settings are under [Configuration](#configuration); the
+   [`compose.yaml`](compose.yaml) in the repository lists them all, with
+   comments. If you'd rather keep secrets out of the compose file, use
    `env_file: .env` or `${VAR}` references instead.
 4. **Authorise** with Last.fm, once:
 
@@ -37,8 +56,8 @@ multi-arch Docker image.
    docker compose logs -f
    ```
 
-The image runs as uid 65532 and keeps its state in `/data`. With a bind mount,
-make the directory writable for that uid, or set `user:` in `compose.yaml`.
+The image runs as uid 65532 and keeps its state in `/data`. Instead of the
+`chown`, you can set `user: "1000:1000"` (your own uid) in `compose.yaml`.
 
 Without Docker: `go install github.com/alator21/tay-backend-scrobbler/cmd/scrobbler@latest`,
 set the same environment variables, and run `scrobbler run`.
@@ -47,28 +66,23 @@ set the same environment variables, and run `scrobbler run`.
 
 All settings, including secrets, are environment variables.
 
-| Variable | |
-|---|---|
-| `LASTFM_API_KEY`, `LASTFM_API_SECRET` | Required. Your Last.fm API account. |
-| `LASTFM_SESSION_KEY` | Required to scrobble. Printed by `scrobbler auth`. |
-| `YTM_COOKIE` | The YT Music `Cookie` header. Changing it needs a restart. |
-| `YTM_COOKIE_FILE` | Used when `YTM_COOKIE` is empty. Default `$DATA_DIR/cookie.txt`. Re-read whenever the file changes, so an expired cookie can be replaced without a restart. |
-| `DATA_DIR` | Database and state. Default `data` (`/data` in the image). |
-| `NTFY_URL` | Optional. ntfy topic URL for alerts, e.g. `https://ntfy.sh/some-long-random-topic`. Without it, alerts are only logged. |
-| `NTFY_TOKEN` | Optional. Access token for protected ntfy topics. |
-| `HEARTBEAT_URL` | Optional. GET after every poll, for a dead-man's-switch monitor such as an Uptime Kuma push monitor or healthchecks.io. |
-| `TZ` | Timezone for log timestamps. |
-
-Optional tuning (defaults shown):
-
-| Variable | |
-|---|---|
-| `POLL_INTERVAL=30s` | How often to poll while a song may be playing. Shorter means tighter start times and play lengths. |
-| `IDLE_POLL_INTERVAL=3m` | How often to poll otherwise. |
-| `SEND_INTERVAL=15m` | How often to retry pending plays. Plays are also sent as soon as they end. |
-| `SCROBBLE_UNSURE=true` | Whether to scrobble plays whose length can't be told well enough to apply Last.fm's rule, typically after downtime. `false` marks them `skipped`. The last play of a session is scrobbled either way. |
-| `ARTIST_MODE=first` | `first` scrobbles collaborations under their first artist; `all` joins them as `A & B`. |
-| `RAW_RETENTION=336h` | How long to keep raw history responses (saved on fresh starts, resyncs, errors and when entries vanish from or return to the history, for debugging; about 0.5 MB each). `0` doesn't save them. |
+| Variable | Default | |
+|---|---|---|
+| `LASTFM_API_KEY`, `LASTFM_API_SECRET` | | Required. Your Last.fm API account. |
+| `LASTFM_SESSION_KEY` | | Required to scrobble. Printed by `scrobbler auth`. |
+| `YTM_COOKIE` | | Required, unless the cookie is in `YTM_COOKIE_FILE`. The YT Music `Cookie` header. Changing it needs a restart. |
+| `YTM_COOKIE_FILE` | `$DATA_DIR/cookie.txt` | Used when `YTM_COOKIE` is empty. Re-read whenever the file changes, so an expired cookie can be replaced without a restart. |
+| `DATA_DIR` | `data` (`/data` in the image) | Database and state. |
+| `NTFY_URL` | | Optional. ntfy topic URL for alerts, e.g. `https://ntfy.sh/some-long-random-topic`. Without it, alerts are only logged. |
+| `NTFY_TOKEN` | | Optional. Access token for protected ntfy topics. |
+| `HEARTBEAT_URL` | | Optional. GET after every poll, for a dead-man's-switch monitor such as an Uptime Kuma push monitor or healthchecks.io. |
+| `TZ` | | Timezone for log timestamps. |
+| `POLL_INTERVAL` | `30s` | How often to poll while a song may be playing. Shorter means tighter start times and play lengths. |
+| `IDLE_POLL_INTERVAL` | `3m` | How often to poll otherwise. |
+| `SEND_INTERVAL` | `15m` | How often to retry pending plays. Plays are also sent as soon as they end. |
+| `SCROBBLE_UNSURE` | `true` | Whether to scrobble plays whose length can't be told well enough to apply Last.fm's rule, typically after downtime. `false` marks them `skipped`. The last play of a session is scrobbled either way. |
+| `ARTIST_MODE` | `first` | `first` scrobbles collaborations under their first artist; `all` joins them as `A & B`. |
+| `RAW_RETENTION` | `336h` | How long to keep raw history responses (saved on fresh starts, resyncs, errors and when entries vanish from or return to the history, for debugging; about 0.5 MB each). `0` doesn't save them. |
 
 Durations use Go syntax (`30s`, `5m`, `336h`). `run` also takes `-interval`,
 `-idle-interval` and `-send-interval` flags, which override the variables.

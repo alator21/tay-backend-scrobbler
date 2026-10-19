@@ -7,6 +7,7 @@ services:
     image: alator21/tay-backend-scrobbler:latest
     restart: unless-stopped
     environment:
+      # Required.
       # Last.fm API account: https://www.last.fm/api/account/create
       LASTFM_API_KEY: ""
       LASTFM_API_SECRET: ""
@@ -16,19 +17,26 @@ services:
       # Leave empty to read data/cookie.txt instead, which can be replaced
       # without a restart. Write any "$" in it as "$$".
       YTM_COOKIE: ""
-      # Optional: alerts via ntfy, e.g. https://ntfy.sh/some-long-random-topic
+
+      # Optional; defaults shown.
+      # Alerts via ntfy, e.g. https://ntfy.sh/some-long-random-topic
       NTFY_URL: ""
       NTFY_TOKEN: ""
-      # Optional: URL to GET after every poll, e.g. an uptime monitor's push URL.
+      # URL to GET after every poll, e.g. an uptime monitor's push URL.
       HEARTBEAT_URL: ""
+      # Timezone for log timestamps.
       TZ: UTC
-      # Optional tuning; see the README for what each does.
-      # POLL_INTERVAL: 30s
-      # IDLE_POLL_INTERVAL: 3m
-      # SEND_INTERVAL: 15m
-      # SCROBBLE_UNSURE: "true"
-      # ARTIST_MODE: first
-      # RAW_RETENTION: 336h
+      # Polling and sending intervals while a song may be playing, otherwise,
+      # and for retrying pending plays.
+      POLL_INTERVAL: 30s
+      IDLE_POLL_INTERVAL: 3m
+      SEND_INTERVAL: 15m
+      # Scrobble plays whose length is unsure, typically after downtime.
+      SCROBBLE_UNSURE: "true"
+      # "first" artist of a collaboration, or "all" joined as "A & B".
+      ARTIST_MODE: first
+      # How long to keep raw history responses for debugging; 0 keeps none.
+      RAW_RETENTION: 336h
     volumes:
       # Database and state, and cookie.txt unless YTM_COOKIE is set.
       - ./data:/data
