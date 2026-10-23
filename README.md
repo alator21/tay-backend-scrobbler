@@ -111,6 +111,7 @@ scrobbler auth             # authorise with Last.fm, print LASTFM_SESSION_KEY
 scrobbler history          # fetch and print the current history once
 scrobbler list [status]    # plays by status (default pending)
 scrobbler send [-dry-run]  # scrobble pending plays now
+scrobbler fix [-album name] <id> <artist> <title>  # fix a play in review
 ```
 
 With Docker: `docker compose run --rm scrobbler list review`, etc.
@@ -119,6 +120,11 @@ Each play has a status: `playing` until it ends, then `pending` (to scrobble),
 `skipped` (ran too short), or `review` (artist/title couldn't be worked out);
 pending plays become `sent`, `rejected` (Last.fm ignored them; the reason is
 shown) or `expired` (older than Last.fm's 14-day limit).
+
+To scrobble a play in `review`, take its id (the first column of
+`list review`) and give it the right artist and title, e.g.
+`scrobbler fix 42 Paramore "Another Day"`. It becomes `pending` and is
+scrobbled on the next send.
 
 ## Alerts
 

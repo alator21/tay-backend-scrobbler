@@ -196,6 +196,35 @@ func TestMarkSentAndFailed(t *testing.T) {
 	}
 }
 
+func TestFix(t *testing.T) {
+	ctx := context.Background()
+	s := open(t)
+	if _, err := s.EndPlay(ctx, untitled, win(0, 30*time.Second), t0, Ending{Verdict: SessionEnd}); err != nil {
+		t.Fatal(err)
+	}
+	plays, _ := s.Plays(ctx, Review)
+	if len(plays) != 1 {
+		t.Fatalf("review = %+v", plays)
+	}
+	id := plays[0].ID
+
+	if err := s.Fix(ctx, id, meta.Scrobble{Artist: "Paramore"}); err == nil {
+		t.Error("fixing without a track should fail")
+	}
+	want := meta.Scrobble{Artist: "Paramore", Track: "Misery Business", Album: "Riot!"}
+	if err := s.Fix(ctx, id, want); err != nil {
+		t.Fatal(err)
+	}
+	pending, _ := s.Plays(ctx, Pending)
+	if len(pending) != 1 || pending[0].ID != id || pending[0].Scrobble != want {
+		t.Errorf("pending = %+v", pending)
+	}
+	// Only plays in review can be fixed.
+	if err := s.Fix(ctx, id, meta.Scrobble{Artist: "Paramore", Track: "Other"}); err == nil {
+		t.Error("fixing a pending play should fail")
+	}
+}
+
 // A database created before the send columns existed is migrated in place.
 func TestMigrateFromV1(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "old.db")

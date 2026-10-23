@@ -252,6 +252,25 @@ func (s *Store) resolve(ctx context.Context, id int64, st Status, sentAt sql.Nul
 	return nil
 }
 
+// Fix sets the metadata of a play in review, whose metadata couldn't be
+// cleaned, and makes it pending so it gets scrobbled.
+func (s *Store) Fix(ctx context.Context, id int64, sc meta.Scrobble) error {
+	if sc.Artist == "" || sc.Track == "" {
+		return fmt.Errorf("store: fix play %d: artist and track are required", id)
+	}
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE plays SET artist = ?, track = ?, album = ?, parsed = 0, status = ?
+		WHERE id = ? AND status = ?`,
+		sc.Artist, sc.Track, nullString(sc.Album), Pending, id, Review)
+	if err != nil {
+		return fmt.Errorf("store: fix play %d: %w", id, err)
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return fmt.Errorf("store: fix play %d: not in review", id)
+	}
+	return nil
+}
+
 // Plays returns the plays with the given status, oldest first.
 func (s *Store) Plays(ctx context.Context, st Status) ([]Play, error) {
 	rows, err := s.db.QueryContext(ctx, `

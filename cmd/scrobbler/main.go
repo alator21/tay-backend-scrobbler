@@ -5,6 +5,8 @@
 //	scrobbler history          fetch and print the history once
 //	scrobbler send [-dry-run]  scrobble pending plays now
 //	scrobbler list [status]    list plays with a status (default pending)
+//	scrobbler fix [-album name] <id> <artist> <title>
+//	                           give a play in review its metadata and scrobble it
 //
 // Configuration, including all secrets, comes from environment variables;
 // see config.go and the README.
@@ -21,12 +23,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/alator21/tay-backend-scrobbler/internal/alert"
 	"github.com/alator21/tay-backend-scrobbler/internal/lastfm"
+	"github.com/alator21/tay-backend-scrobbler/internal/meta"
 	"github.com/alator21/tay-backend-scrobbler/internal/notify"
 	"github.com/alator21/tay-backend-scrobbler/internal/poller"
 	"github.com/alator21/tay-backend-scrobbler/internal/send"
@@ -40,6 +44,8 @@ const usage = `usage: scrobbler <command> [flags]
   history          fetch and print the history once
   send [-dry-run]  scrobble pending plays now
   list [status]    list plays with a status (default pending)
+  fix [-album name] <id> <artist> <title>
+                   give a play in review its metadata and scrobble it
 
 Configuration comes from environment variables (see the README).`
 
@@ -69,6 +75,8 @@ func main() {
 		err = sendCmd(ctx, cfg, args)
 	case "list":
 		err = listCmd(ctx, cfg, args)
+	case "fix":
+		err = fixCmd(ctx, cfg, args)
 	default:
 		flag.Usage()
 		os.Exit(2)
@@ -301,7 +309,7 @@ func list(ctx context.Context, cfg config, status store.Status) error {
 		return err
 	}
 	for _, p := range plays {
-		fmt.Printf("%s  ", p.StartedAt.Local().Format("2006-01-02 15:04:05"))
+		fmt.Printf("%4d  %s  ", p.ID, p.StartedAt.Local().Format("2006-01-02 15:04:05"))
 		if p.Scrobble.Artist != "" {
 			fmt.Printf("%s – %s", p.Scrobble.Artist, p.Scrobble.Track)
 			if p.Scrobble.Album != "" {
@@ -323,6 +331,40 @@ func list(ctx context.Context, cfg config, status store.Status) error {
 		fmt.Println()
 	}
 	fmt.Printf("%d %s\n", len(plays), status)
+	return nil
+}
+
+func fixCmd(ctx context.Context, cfg config, args []string) error {
+	fs := flag.NewFlagSet("fix", flag.ExitOnError)
+	album := fs.String("album", "", "album to scrobble it with")
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "usage: scrobbler fix [-album name] <id> <artist> <title>\n\nThe id is the first column of `scrobbler list review`.")
+		fs.PrintDefaults()
+	}
+	fs.Parse(args)
+	if fs.NArg() != 3 {
+		fs.Usage()
+		os.Exit(2)
+	}
+	id, err := strconv.ParseInt(fs.Arg(0), 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid id %q", fs.Arg(0))
+	}
+	sc := meta.Scrobble{
+		Artist: strings.TrimSpace(fs.Arg(1)),
+		Track:  strings.TrimSpace(fs.Arg(2)),
+		Album:  strings.TrimSpace(*album),
+	}
+
+	st, err := cfg.store()
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	if err := st.Fix(ctx, id, sc); err != nil {
+		return err
+	}
+	fmt.Printf("play %d is pending as %s – %s; it is scrobbled on the next send, or run `scrobbler send`\n", id, sc.Artist, sc.Track)
 	return nil
 }
 
